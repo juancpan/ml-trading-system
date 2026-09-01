@@ -1,0 +1,105 @@
+# Data Source Configuration
+# Centralized configuration for data sources across backtesting and live trading
+
+data_sources:
+  # Stock/ETF data configuration
+  stocks:
+    source: yfinance  # Use Yahoo Finance for stocks
+    symbols:
+      - SPY
+      - QQQ
+      - IWM
+      - DIA
+      - ARKK
+    features:
+      use_adjusted_close: true  # Use dividend-adjusted prices
+      
+  # Cryptocurrency data configuration  
+  crypto:
+    source: hybrid  # Options: yfinance, ccxt, hybrid (recommended)
+    exchange: bybit  # Primary exchange for live/recent data
+    
+    # Hybrid fetcher settings
+    hybrid:
+      historical_source: yfinance  # For 5+ years of data
+      recent_source: ccxt  # For recent/live data
+      overlap_days: 30  # Days to calculate adjustment factor
+      max_adjustment: 1.25  # Cap adjustment factor
+      min_adjustment: 0.80  # Floor adjustment factor
+      
+    # Symbol mappings (yfinance -> CCXT)
+    symbol_mappings:
+      BTC-USD: BTC/USDT
+      ETH-USD: ETH/USDT
+      SOL-USD: SOL/USDT
+      DOGE-USD: DOGE/USDT
+      ADA-USD: ADA/USDT
+      DOT-USD: DOT/USDT
+      MATIC-USD: MATIC/USDT
+      LINK-USD: LINK/USDT
+      AVAX-USD: AVAX/USDT
+      UNI-USD: UNI/USDT
+      
+    # Symbols to trade
+    symbols:
+      - BTC/USDT
+      - ETH/USDT
+      - SOL/USDT
+      - DOGE/USDT
+
+# Backtesting configuration
+backtesting:
+  # Use consistent data source based on asset type
+  auto_detect_crypto: true  # Automatically use hybrid for crypto
+  
+  # Cache settings
+  cache:
+    enabled: true
+    directory: data/cache
+    ttl_hours: 24  # Cache time-to-live
+    
+  # Data validation
+  validation:
+    check_discrepancy: true  # Warn if price discrepancy > threshold
+    discrepancy_threshold: 0.05  # 5% threshold
+    min_overlap_days: 5  # Minimum days for adjustment calculation
+
+# Live trading configuration
+live_trading:
+  # Always use exchange data for live trading
+  crypto:
+    source: ccxt
+    exchange: bybit
+    
+  stocks:
+    source: ibkr  # Interactive Brokers
+    
+# Logging
+logging:
+  log_data_source: true  # Log which data source is used
+  log_adjustment_factor: true  # Log adjustment factors applied
+  log_discrepancies: true  # Log when discrepancies detected
+
+# Feature engineering
+features:
+  # Ensure consistency between backtest and live
+  returns_type: simple  # simple or log
+  lag_periods: 5
+  
+  # Technical indicators
+  indicators:
+    sma_periods: [20, 50]
+    rsi_period: 14
+    
+# Timezone settings
+timezone:
+  crypto: UTC  # Always use UTC for crypto
+  stocks: America/New_York  # NYSE timezone for stocks
+  
+# Data quality checks
+quality_checks:
+  check_missing_data: true
+  check_outliers: true
+  outlier_threshold: 10  # Standard deviations
+  check_volume: true
+  min_volume: 1000  # Minimum volume to consider valid

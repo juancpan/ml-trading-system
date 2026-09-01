@@ -1,0 +1,414 @@
+# Feature Engineering Configuration
+# ===================================
+# Centralized config for all ML model features.
+# Used identically in backtesting, WFOV validation, and live trading.
+#
+# To add a new indicator:
+#   1. Add it under defaults (for all models) or model_overrides (for specific models)
+#   2. The indicator name must match a registered name in FeatureRegistry
+#   3. Parameters are passed as keyword arguments to the compute function
+#
+# Available indicators (see algos/common/feature_engine.py for full list):
+#   Trend:      sma, ema
+#   Momentum:   rsi, macd, roc, stoch, williams_r, cci, mfi
+#   Volatility: bbands, atr, rolling_std, keltner
+#   Volume:     vwap, obv, volume_ratio
+#   Derived:    high_low_range, close_to_open_gap, return_zscore
+#   Calendar:   calendar (day-of-week, month cyclical encoding)
+#   External:   configured via the 'external' section
+#   Legacy:     lagged_returns (the original 5-lag features)
+
+feature_engineering:
+
+  # ---------------------------------------------------------------
+  # Global defaults — applied to ALL models unless overridden
+  # ---------------------------------------------------------------
+  defaults:
+
+    # Lagged log returns (existing behavior, kept for backward compatibility)
+    lagged_returns:
+      lags: [1, 2, 3, 4, 5]
+
+    # Trend indicators (normalized as % deviation from close)
+    trend:
+      sma:
+        - {period: 10}
+        - {period: 20}
+        - {period: 50}
+      ema:
+        - {period: 10}
+        - {period: 20}
+
+    # Momentum indicators (pre-scaled to roughly [-1, 1])
+    momentum:
+      rsi:
+        - {period: 14}
+      rsi2: [{}]                # Connors RSI-2 (2-period, proven mean-reversion signal)
+      macd:
+        - {fast: 12, slow: 26, signal: 9}
+      roc:
+        - {period: 10}
+
+    # Volatility indicators (normalized by close price where applicable)
+    volatility:
+      bbands:
+        - {period: 20, std: 2.0}
+      atr:
+        - {period: 14}
+      rolling_std:
+        - {period: 10}
+        - {period: 30}
+
+    # Research-backed alpha features
+    # Sources: Quantpedia, 100k-backtest study, SSRN Hurst exponent papers
+    alpha:
+      hurst:
+        - {period: 100}          # Regime detection: <0.5 mean-reverting, >0.5 trending
+      dma:
+        - {period: 5}            # Short-term distance from MA (mean-reversion stretch)
+        - {period: 20}           # Medium-term distance from MA
+
+    # Volume indicators (skipped gracefully if volume data unavailable)
+    volume:
+      vwap: [{}]
+      obv: [{}]
+      volume_ratio:
+        - {period: 20}
+
+    # External data features
+    # Each entry fetches a ticker from Yahoo Finance and aligns to primary data
+    external:
+      vix_close:
+        ticker: "^VIX"
+        column: "close"
+      # Uncomment to add more external features:
+      spy_returns:
+        ticker: "SPY"
+        column: "close"
+      tlt_close:
+        ticker: "TLT"
+        column: "close"
+      vix3m_close:
+        ticker: "^VIX3M"
+        column: "close"
+      dollar_index:
+        ticker: "FRED:DTWEXBGS"
+        column: "close"
+      gold_close:
+        ticker: "GC=F"
+        column: "close"
+      copper_close:
+        ticker: "HG=F"
+        column: "close"
+    # Computed cross-asset indicators
+    derived:
+      vix_term_slope: [{}]
+      ratio:
+        - { series_a: "copper_close", series_b: "gold_close" }
+      
+
+  # ---------------------------------------------------------------
+  # Per-model overrides
+  # ---------------------------------------------------------------
+  # Each model can:
+  #   - include_defaults: true/false (default true)
+  #   - exclude: [list of groups to exclude]  (e.g., external, volume)
+  #   - additional: {extra indicators beyond defaults}
+  model_overrides:
+
+    svm_optimized:
+      include_defaults: true
+      # SVM handles normalized features well; defaults are good
+
+    rf_optimized: &rf_override
+      include_defaults: true
+      additional:
+        # Trees handle feature interactions; add more momentum
+        momentum:
+          stoch:
+            - {k: 14, d: 3}
+
+    # Alias — same config as rf_optimized
+    random_forest_optimized: *rf_override
+
+    xgb_optimized: &xgb_override
+      include_defaults: true
+      additional:
+        momentum:
+          stoch:
+            - {k: 14, d: 3}
+          williams_r:
+            - {period: 14}
+          connors_rsi:
+            - {rsi_period: 3, streak_period: 2, pctrank_period: 100}
+        volatility:
+          keltner:
+            - {period: 20, multiplier: 2.0}
+        derived:
+          calendar: [{}]
+
+    # Alias — same config as xgb_optimized
+    xgboost_optimized: *xgb_override
+
+    linear_optimized:
+      include_defaults: true
+      # Linear models need well-behaved features; defaults suffice
+
+    logistic_optimized:
+      include_defaults: true
+
+    sgd_optimized:
+      include_defaults: true
+
+    ensemble_optimized:
+      include_defaults: true
+      additional:
+        momentum:
+          cci:
+            - {period: 20}
+          mfi:
+            - {period: 14}
+        derived:
+          high_low_range:
+            - {period: 10}
+          close_to_open_gap: [{}]
+          return_zscore:
+            - {period: 20}
+          calendar: [{}]
+
+    ensemble_voting:
+      include_defaults: true
+
+    ensemble_stacking:
+      include_defaults: true
+
+    ensemble_adaptive:
+      include_defaults: true
+      additional:
+        momentum:
+          cci:
+            - {period: 20}
+        derived:
+          calendar: [{}]
+
+    lstm_optimized:
+      # LSTM uses sequence features — exclude external data
+      # to keep the sequence input clean
+      include_defaults: true
+      exclude:
+        - external
+
+    # -----------------------------------------------------------------
+    # Carry trade models — forex pairs have no meaningful volume data.
+    # Exclude volume indicators, add macro/rates externals for carry
+    # timing decisions. These overrides apply when backtesting forex
+    # pairs like USDJPY, EURJPY for the carry trade engine.
+    # -----------------------------------------------------------------
+    carry_gnb:
+      include_defaults: true
+      exclude:
+        - volume
+      additional:
+        external:
+          dxy_close:
+            ticker: "DX-Y.NYB"
+            column: "close"
+          us_13wk_yield:
+            ticker: "^IRX"
+            column: "close"
+          us_10yr_yield:
+            ticker: "^TNX"
+            column: "close"
+
+    carry_svm:
+      include_defaults: true
+      exclude:
+        - volume
+      additional:
+        external:
+          dxy_close:
+            ticker: "DX-Y.NYB"
+            column: "close"
+          us_13wk_yield:
+            ticker: "^IRX"
+            column: "close"
+          us_10yr_yield:
+            ticker: "^TNX"
+            column: "close"
+
+    carry_xgb:
+      include_defaults: true
+      exclude:
+        - volume
+      additional:
+        momentum:
+          stoch:
+            - {k: 14, d: 3}
+          williams_r:
+            - {period: 14}
+        volatility:
+          keltner:
+            - {period: 20, multiplier: 2.0}
+        derived:
+          calendar: [{}]
+        external:
+          dxy_close:
+            ticker: "DX-Y.NYB"
+            column: "close"
+          us_13wk_yield:
+            ticker: "^IRX"
+            column: "close"
+          us_10yr_yield:
+            ticker: "^TNX"
+            column: "close"
+
+  # ---------------------------------------------------------------
+  # Per-ticker overrides (Level 3)
+  # ---------------------------------------------------------------
+  # Override features for specific tickers. Useful when:
+  #   - Volume data unavailable (forex)
+  #   - Different external benchmarks apply
+  #   - Ticker has unique characteristics
+  #
+  # Keys can be:
+  #   "TICKER"              -> applies to all models for that ticker
+  #   "TICKER:model_name"   -> applies only to that ticker+model combo (Level 4)
+  #
+  # Each entry supports: include_defaults, exclude, additional, external
+  ticker_overrides:
+    # Forex tickers have no volume data
+    "USDJPY":
+      exclude:
+        - volume
+      additional:
+        external:
+          # Macro rates (existing)
+          japan_10y_yield:
+            ticker: "FRED:IRLTLT01JPM156N"
+            column: "close"
+          boj_rate:
+            ticker: "FRED:IRSTCB01JPM156N"
+            column: "close"
+          fed_rate:
+            ticker: "FRED:FEDFUNDS"
+            column: "close"
+          dollar_index:
+            ticker: "FRED:DTWEXBGS"
+            column: "close"
+          # Cross-asset features (new)
+          nikkei_close:
+            ticker: "^N225"
+            column: "close"
+          vix3m_close:
+            ticker: "^VIX3M"
+            column: "close"
+          gold_close:
+            ticker: "GC=F"
+            column: "close"
+          copper_close:
+            ticker: "HG=F"
+            column: "close"
+        # Computed cross-asset indicators
+        derived:
+          vix_term_slope: [{}]
+          ratio:
+            - { series_a: "copper_close", series_b: "gold_close" }
+        momentum:
+          roc:
+            - { period: 20 }
+
+    "EURJPY":
+      exclude:
+        - volume
+      additional:
+        external:
+          japan_10y_yield:
+            ticker: "FRED:IRLTLT01JPM156N"
+            column: "close"
+          boj_rate:
+            ticker: "FRED:IRSTCB01JPM156N"
+            column: "close"
+          fed_rate:
+            ticker: "FRED:FEDFUNDS"
+            column: "close"
+          ecb_rate:
+            ticker: "FRED:ECBDFR"
+            column: "close"
+          dollar_index:
+            ticker: "FRED:DTWEXBGS"
+            column: "close"
+          nikkei_close:
+            ticker: "^N225"
+            column: "close"
+          eurostoxx_close:
+            ticker: "^STOXX50E"
+            column: "close"
+        derived:
+          vix_term_slope: [{}]
+        momentum:
+          roc:
+            - { period: 20 }
+
+    "GBPJPY":
+      exclude:
+        - volume
+      additional:
+        external:
+          japan_10y_yield:
+            ticker: "FRED:IRLTLT01JPM156N"
+            column: "close"
+          boj_rate:
+            ticker: "FRED:IRSTCB01JPM156N"
+            column: "close"
+          dollar_index:
+            ticker: "FRED:DTWEXBGS"
+            column: "close"
+
+    "AUDJPY":
+      exclude:
+        - volume
+
+    "CADJPY":
+      exclude:
+        - volume
+
+    "CHFJPY":
+      exclude:
+        - volume
+
+    "EURUSD=X":
+      exclude:
+        - volume
+      additional:
+        external:
+          # dxy_close:
+          #   ticker: "DX-Y.NYB"
+          #   column: "close"
+          dollar_index:
+            ticker: "FRED:DTWEXBGS"
+            column: "close"
+
+    "GBPUSD=X":
+      exclude:
+        - volume
+
+    "AUDUSD=X":
+      exclude:
+        - volume
+
+    # Example: ticker+model combo override
+    # "NVDA:xgb_optimized":
+    #   additional:
+    #     derived:
+    #       calendar: [{}]
+    #     external:
+    #       qqq_close:
+    #         ticker: "QQQ"
+    #         column: "close"
+
+# ---------------------------------------------------------------
+# Warmup configuration
+# ---------------------------------------------------------------
+warmup_periods:
+  auto: true          # Auto-calculate from max indicator period
+  minimum: 60         # Floor: at least 60 bars of warmup
