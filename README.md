@@ -163,8 +163,8 @@ and `docs/REVISION_POLICY.md`):
 
 ## Quickstart
 
-Python 3.9+ (developed on 3.11). TensorFlow 2.19 / Keras 3.9 for the deep
-models; scikit-learn-classic models need none of that.
+Python 3.11–3.12 (developed on 3.11). TensorFlow 2.19 / Keras 3.15 for the
+deep models; scikit-learn-classic models need none of that.
 
 ```bash
 git clone https://github.com/juancpan/ml-trading-system.git
