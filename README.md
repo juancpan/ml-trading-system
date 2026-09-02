@@ -2,7 +2,7 @@
 
 **Walk-forward-validated ML strategies with a live-execution layer for Interactive Brokers.**
 
-A personal research + trading platform: a 30+-model strategy lab, a statistically
+A personal research + trading platform: a 28-model strategy lab, a statistically
 rigorous walk-forward validation framework (WFOV) designed to *deflate* the
 results data mining produces, an anti-overfitting research governance protocol,
 and a production execution engine with layered risk controls — connected
@@ -85,7 +85,7 @@ and `docs/REVISION_POLICY.md`):
                  └────────────────────────────┬───────────────────────────┘
                                               │ identical features
                  ┌────────────────────────────▼───────────────────────────┐
-                 │                 MODEL LAB (30+ models)                  │
+                 │                  MODEL LAB (28 models)                  │
                  │  algos/backtest_code/models/ — SVM, LSTM, DQN, TCN,     │
                  │  XGBoost, ARIMA/SARIMAX/VAR, RF, ensembles, ...          │
                  │  run_backtest_optimized.py · portimization.py (MIQP/HRP)│
@@ -124,8 +124,8 @@ and `docs/REVISION_POLICY.md`):
 ## Key features
 
 **Research core (`algos/`)**
-- 30+ model implementations (one file per model, common `BaseStrategyModel`
-  interface) with optimized variants (GPU/batch/caching) — LSTM, DQN, TCN,
+- 28 model implementations registered behind a common `BaseStrategyModel`
+  interface, with optimized variants (GPU/batch/caching) — LSTM, DQN, TCN,
   XGBoost, SVM, ARIMA/SARIMAX/VAR, random forest, gradient boosting,
   stacking/voting ensembles, and more
 - Config-driven feature engineering shared byte-for-byte by backtest, WFOV,
@@ -154,7 +154,7 @@ and `docs/REVISION_POLICY.md`):
   failure class and Telegram alerting on every abort
 
 **Testing discipline (`tests/`)**
-- 32-module pytest suite (195 tests): kill-switch decisions, circuit-breaker
+- 31-module pytest suite (195 tests): kill-switch decisions, circuit-breaker
   math, trials-ledger accounting, portfolio deployer, symbol resolution,
   signal-history integrity, feature-engine edge cases
 - Test isolation taken seriously: `conftest.py` scrubs real credentials at
@@ -207,7 +207,7 @@ before pointing it at anything real.
 |---|---|---|
 | **Data** | `python -m algos.common.update_market_data` | Refreshes the parquet store (IBKR primary; yfinance fallback in `data_loader`) |
 | **Features** | `feature_config.yaml` → `algos/common/feature_engine.py` | One feature definition, consumed identically by backtest/WFOV/live |
-| **Backtest** | `algos/backtest_code/run_backtest_optimized.py` | Train + backtest any of 30+ models with transaction costs, embargo, risk metrics |
+| **Backtest** | `algos/backtest_code/run_backtest_optimized.py` | Train + backtest any of 28 models with transaction costs, embargo, risk metrics |
 | **Portfolio** | `algos/backtest_code/portimization.py`, `portfolio_exploration_global.py` | HRP / efficient-frontier / MIQP weight construction; OOS gating via `weekly_gate_engine.py` |
 | **Validate** | `python -m algos.wfov.wfov_runner --mode walk_forward_expanding ...` | Walk-forward + Monte Carlo validation, DSR/PBO/Newey-West/bootstrap, regime analysis |
 | **Select** | `python scripts/model_selection_workflow.py --ticker SPY --preset comprehensive` | Batch model comparison over the ticker universe, tiered ranking (DEPLOY/REVIEW/REJECT) |
@@ -220,7 +220,7 @@ before pointing it at anything real.
 
 ```
 ├── algos/
-│   ├── backtest_code/        # 30+ model implementations, runners, portfolio optimization
+│   ├── backtest_code/        # 28 model implementations, runners, portfolio optimization
 │   ├── common/               # data loading, feature engine, metrics, embargo, seeds, downloaders
 │   ├── wfov/                 # walk-forward validation framework (the statistical core)
 │   └── tests/                # unit tests for the research core
